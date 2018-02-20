@@ -39,6 +39,13 @@ class TestAlooma(unittest.TestCase):
         inputs = self.api.get_inputs()
         assert_true(isinstance(inputs, list))
 
+    def test_get_input(self):
+        inputs = self.api.get_inputs()
+        input_name = inputs[0]['name']
+
+        input = self.api.get_input(input_name)
+        assert_equals(input.keys(), ["job", "tasks"])
+
     # endregion
 
     # region Consolidation

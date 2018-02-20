@@ -840,23 +840,50 @@ class Client(object):
 
     def get_inputs(self, name=None, input_type=None, input_id=None):
         """
-        Get a list of all the input nodes in the system
+        Get a list of all the inputs in the system
         :param name: Filter by name (accepts Regex)
         :param input_type: Filter by type (e.g. "mysql")
-        :param input_id: Filter by node ID
+        :param input_id: Filter by Input ID
         :return: A list of all the inputs in the system, along
         with metadata and configurations
         """
-        nodes = [node for node in self.get_plumbing()['nodes']
-                 if node['category'] == 'INPUT']
+        inputs = self._get_inputs().values()
         if input_type:
-            nodes = [node for node in nodes if node['type'] == input_type]
+            inputs = [inp for inp in inputs if inp['type'] == input_type]
         if name:
             regex = re.compile(name)
-            nodes = [node for node in nodes if regex.match(node['name'])]
+            inputs = [inp for inp in inputs if regex.match(inp['name'])]
         if input_id:
-            nodes = [node for node in nodes if node['id'] == input_id]
-        return nodes
+            inputs = [inp for inp in inputs if inp['id'] == input_id]
+
+        return inputs
+
+    def get_input(self, name=None, id=None):
+        """ Return Dict of Input Configuration and Task Information
+        :param name: Name of the Input to Pull
+        :param id: IDof the Input to Pull
+        :return: A dict with the job and task data
+        """
+        if name:
+            inputs = self._get_inputs().values()
+            input = [i for i in inputs if i['name']==name]
+            if len(input)!=1:
+                raise Exception("Input %s Does Not Exist" % name)
+
+            id = input[0]['id']
+
+        return self._get_input(id)
+
+
+    def _get_inputs(self):
+        url = self.rest_url + endpoints.INPUTS
+        res = self.__send_request(requests.get, url)
+        return parse_response_to_json(res)
+
+    def _get_input(self, id):
+        url = self.rest_url + endpoints.INPUT_STATE.format(input_id=id)
+        res = self.__send_request(requests.get, url)
+        return parse_response_to_json(res)
 
     def get_output_node(self):
         url = self.rest_url + 'plumbing/outputs'
