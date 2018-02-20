@@ -5,6 +5,8 @@ import requests
 import warnings
 from six.moves import urllib
 
+from . import endpoints
+
 MAPPING_MODES = ['AUTO_MAP', 'STRICT', 'FLEXIBLE']
 EVENT_DROPPING_TRANSFORM_CODE = "def transform(event):\n\treturn None"
 DEFAULT_TRANSFORM_CODE = "def transform(event):\n\treturn event"
@@ -1281,22 +1283,39 @@ class Client(object):
 
         return res.json()
 
-    # SCHEDULED QUERIES #
+    # region Consolidation
+
     def get_scheduled_queries(self):
         """
         Returns all scheduled queries
         :return: a dict representing all scheduled queries
         """
-        url = self.rest_url + 'consolidation'
-        return requests.get(url, **self.requests_params).json()
+        results = {}
+
+        url = self.rest_url + endpoints.CONSOLIDATION_V2
+        queries = self.__send_request(requests.get, url).json()
+
+        for query in queries:
+            results[query["id"]] = query
+
+        return results
 
     def remove_scheduled_query(self, query_id):
-        url = self.rest_url + 'consolidation/' + query_id
+        url = self.rest_url + endpoints.CONSOLIDATION_STATE_V2.format(
+                                        query_id=str(query_id))
         res = self.__send_request(requests.delete, url)
         if not res.ok:
             raise Exception('Failed deleting query id=%s '
                             'status_code=%d response=%s' %
                             (query_id, res.status_code, res.content))
+
+    def run_query(self, query_id):
+        """ Run Consolidation """
+        url = self.rest_url + endpoints.CONSOLIDATION_RUN_V2.format(
+                                        query_id=query_id)
+        res = self.__send_request(requests.post, url)
+        
+        return res.json()
 
     def get_scheduled_queries_in_error_state(self):
         """
@@ -1338,6 +1357,8 @@ class Client(object):
         return self.__send_request(requests.post,
                                    scheduled_query_url,
                                    json=data)
+
+    # endregion
 
 
 class Alooma(Client):
