@@ -29,7 +29,15 @@ class TestAlooma(unittest.TestCase):
         deployment = self.api.get_deployment_info()['deploymentName']
         test = deployment.startswith(self.api.account_name)
 
-        assert_true(test) 
+        assert_true(test)
+
+    # endregion
+
+    # region Inputs
+
+    def test_get_inputs(self):
+        inputs = self.api.get_inputs()
+        assert_true(isinstance(inputs, list))
 
     # endregion
 
