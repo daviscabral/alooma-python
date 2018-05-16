@@ -67,6 +67,7 @@ class FailedToCreateInputException(Exception):
 
 
 class Client(object):
+
     def __init__(self, username=None, password=None, account_name=None,
                  base_url=None):
 
@@ -374,7 +375,8 @@ class Client(object):
         event_type = urllib.parse.quote(event_type, safe='')
         url = self.rest_url + 'event-types/{event_type}/mapping'.format(
             event_type=event_type)
-        res = self.__send_request(requests.post, url, json=mapping, timeout=timeout)
+        res = self.__send_request(
+            requests.post, url, json=mapping, timeout=timeout)
         return res
 
     def discard_event_type(self, event_type):
@@ -656,7 +658,7 @@ class Client(object):
                         results.append(s)
         return results
 
-    def get_metrics_by_names(self, metric_names, minutes):
+    def get_metrics_by_names(self, metric_names, minutes, resolution=None):
         if type(metric_names) != list and type(metric_names) == str:
             metric_names = [metric_names]
         elif type(metric_names) != str and type(metric_names) != list:
@@ -668,11 +670,12 @@ class Client(object):
                                 "use one or more of those: {metrics}"
                                 .format(name=metric_names,
                                         metrics=METRICS_LIST))
-
+        if resolution is None:
+            resolution = minutes
         metrics_string = ",".join(metric_names)
         url = self.rest_url + 'metrics?metrics=%s&from=-%dmin' \
                               '&resolution=%dmin' \
-                              '' % (metrics_string, minutes, minutes)
+                              '' % (metrics_string, minutes, resolution)
         res = self.__send_request(requests.get, url)
 
         response = parse_response_to_json(res)
@@ -740,7 +743,7 @@ class Client(object):
         if not values:
             return 0
 
-        return sum(values)/len(values)
+        return sum(values) / len(values)
 
     def get_max_latency(self, minutes):
         try:
@@ -914,7 +917,8 @@ class Client(object):
         return parse_response_to_json(res)
 
     def __fix_bigquery_config(self, output_config):
-        config_url = self.rest_url + 'zk-configuration/featureUseBigQueryNewConnectConfiguration'
+        config_url = self.rest_url + \
+            'zk-configuration/featureUseBigQueryNewConnectConfiguration'
         http_res = self.__send_request(requests.get, config_url)
         json_res = parse_response_to_json(http_res)
         if not json_res['featureUseBigQueryNewLoginConfiguration']:
@@ -950,7 +954,7 @@ class Client(object):
                              on the SSH server
         :return: :type dict. Response's content
         """
-        configuration =  {
+        configuration = {
             'hostname': hostname,
             'port': port,
             'schemaName': schema_name,
@@ -1338,6 +1342,7 @@ class Client(object):
 
 
 class Alooma(Client):
+
     def __init__(self, hostname, username, password, port=8443,
                  server_prefix=''):
         warnings.warn('%s class is deprecated, passing relevant arguments '
