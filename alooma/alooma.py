@@ -855,21 +855,21 @@ class Client(object):
 
         return inputs
 
-    def get_input(self, name=None, id=None):
+    def get_input(self, name=None, input_id=None):
         """ Return Dict of Input Configuration and Task Information
         :param name: Name of the Input to Pull
-        :param id: IDof the Input to Pull
+        :param input_id: IDof the Input to Pull
         :return: A dict with the job and task data
         """
         if name:
             inputs = self._get_inputs().values()
-            input = [i for i in inputs if i['name']==name]
-            if len(input)!=1:
-                raise Exception("Input %s Does Not Exist" % name)
+            input_data = [i for i in inputs if i['name']==name]
+            if len(input_data)!=1:
+                raise KeyError("Input %s Does Not Exist" % name)
 
-            id = input[0]['id']
+            input_id = input_data[0]['id']
 
-        return self._get_input(id)
+        return self._get_input(input_id)
 
 
     def _get_inputs(self):
@@ -877,8 +877,8 @@ class Client(object):
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
 
-    def _get_input(self, id):
-        url = self.rest_url + endpoints.INPUT_STATE.format(input_id=id)
+    def _get_input(self, input_id):
+        url = self.rest_url + endpoints.INPUT_STATE.format(input_id=input_id)
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
 

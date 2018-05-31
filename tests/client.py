@@ -8,7 +8,7 @@ from alooma import Client
 class TestAlooma(unittest.TestCase):
 
     def setUp(self):
-        """ 
+        """
          **** **** **** ******** **** **** ****
          **** Getting an Alooma API Object ****
          **** **** **** ******** **** **** ****
@@ -19,7 +19,7 @@ class TestAlooma(unittest.TestCase):
         ACCOUNT_NAME = os.environ['ALOOMA_DEPLOYMENT']
 
         ## We will use this api object throughout the documentation ##
-        self.api = Client(ALOOMA_USERNAME, ALOOMA_PASSWORD, 
+        self.api = Client(ALOOMA_USERNAME, ALOOMA_PASSWORD,
                                  account_name=ACCOUNT_NAME)
         assert_equals(self.api.account_name, ACCOUNT_NAME)
 
@@ -43,8 +43,8 @@ class TestAlooma(unittest.TestCase):
         inputs = self.api.get_inputs()
         input_name = inputs[0]['name']
 
-        input = self.api.get_input(input_name)
-        assert_equals(input.keys(), ["job", "tasks"])
+        input_data = self.api.get_input(input_name)
+        assert_equals(input_data.keys(), ["job", "tasks"])
 
     # endregion
 
