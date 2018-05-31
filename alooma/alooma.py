@@ -1338,7 +1338,6 @@ class Client(object):
         url = self.rest_url + endpoints.CONSOLIDATION_RUN_V2.format(
                                         query_id=query_id)
         res = self.__send_request(requests.post, url)
-        
         return res.json()
 
     def get_scheduled_queries_in_error_state(self):
