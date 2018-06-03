@@ -1134,12 +1134,6 @@ class Client(object):
 
         self.__send_request(requests.delete, url)
 
-    def get_users(self):
-        url = self.rest_url + 'users/'
-
-        res = self.__send_request(requests.get, url)
-        return parse_response_to_json(res)
-
     def get_settings(self):
         url = self.rest_url + 'settings/'
 
