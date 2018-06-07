@@ -41,9 +41,6 @@ METRICS_LIST = [
     'EVENT_SIZE_AVG',
     'EVENT_SIZE_TOTAL',
     'EVENT_PROCESSING_RATE',
-    'CPU_USAGE',
-    'MEMORY_CONSUMED',
-    'MEMORY_LEFT',
     'INCOMING_EVENTS',
     'RESTREAMED_EVENTS',
     'UNMAPPED_EVENTS',
@@ -62,7 +59,7 @@ DEFAULT_TIMEOUT = 60
 
 MAPPING_TIMEOUT = 300
 
-BASE_URL = 'https://app.alooma.com/'
+BASE_URL = 'https://app.alooma.com'
 
 
 class FailedToCreateInputException(Exception):
@@ -70,9 +67,20 @@ class FailedToCreateInputException(Exception):
 
 
 class Client(object):
-    def __init__(self, username=None, password=None, account_name='',
-                 base_url=BASE_URL):
-        self.rest_url = '%s%s/rest/' % (base_url, account_name)
+
+    def __init__(self, username=None, password=None, account_name=None,
+                 base_url=None):
+
+        if base_url is None:
+            base_url = BASE_URL
+        # for backwards compatibility (alooma_dev.py)
+        base_url = base_url.rstrip('/')
+
+        rest_path = '/rest/'
+        if account_name is not None:
+            rest_path = '/%s/rest/' % account_name
+
+        self.rest_url = base_url + rest_path
 
         self.username = username
         self.password = password
@@ -102,8 +110,8 @@ class Client(object):
                         .format(url=response.url,
                                 failure_reason=response.reason,
                                 failure_content="\nfailure content: " +
-                                                response.content if
-                                response.content else ""))
+                                                response.content.decode()
+                                if response.content.decode() else ""))
 
     def __login(self):
         url = self.rest_url + 'login'
@@ -284,13 +292,17 @@ class Client(object):
         return self.create_input(input_post_data=post_data,
                                  one_click=one_click)
 
-    def create_input(self, input_post_data, one_click=True):
+    def create_input(self, input_post_data, one_click=True, validate=True):
         structure = self.get_structure()
         previous_nodes = [x for x in structure['nodes']
                           if x['name'] == input_post_data['name']]
+        if one_click:
+            input_post_data['configuration']['auto_map'] = "true"
 
-        one_click_str = "" if one_click is False else "?automap=true"
-        url = self.rest_url + ('plumbing/inputs%s' % one_click_str)
+        if not validate:
+            url = self.rest_url + ('inputs%s' % "?validate=false")
+        else:
+            url = self.rest_url + 'plumbing/inputs'
 
         self.__send_request(requests.post, url, json=input_post_data)
 
@@ -315,6 +327,15 @@ class Client(object):
         raise FailedToCreateInputException(
             'Failed to create {type} input'.format(
                 type=input_post_data["type"]))
+
+    def edit_input(self, input_post_data):
+        input_id = input_post_data.get('id')
+        if not input_id:
+            raise Exception('Could not edit input without id')
+
+        url = self.rest_url + ('inputs/%s' % input_id)
+        res = self.__send_request(requests.put, url, json=input_post_data)
+        return res
 
     def create_schema(self, schema_post_data):
         url = self.rest_url + "schemas"
@@ -350,11 +371,12 @@ class Client(object):
         self.set_transform(transform=transform)
 
     def set_mapping(self, mapping, event_type, timeout=MAPPING_TIMEOUT):
-      
+
         event_type = urllib.parse.quote(event_type, safe='')
         url = self.rest_url + 'event-types/{event_type}/mapping'.format(
             event_type=event_type)
-        res = self.__send_request(requests.post, url, json=mapping, timeout=timeout)
+        res = self.__send_request(
+            requests.post, url, json=mapping, timeout=timeout)
         return res
 
     def discard_event_type(self, event_type):
@@ -505,7 +527,7 @@ class Client(object):
         :return:            result of the REST request
         """
         url = self.rest_url + 'inputSleepTime/%s' % input_id
-        res = requests.put(url, str(sleep_time), **self.requests_params)
+        res = requests.put(url, json=sleep_time, **self.requests_params)
         return res
 
     def get_samples_status_codes(self):
@@ -578,6 +600,10 @@ class Client(object):
         res = self.__send_request(requests.post, url, json=data)
         return res
 
+    def delete_transform(self, module_name):
+        url = self.rest_url + 'transform/functions/{}'.format(module_name)
+        return self.__send_request(requests.delete, url)
+
     def test_transform(self, sample, temp_transform=None):
         """
         :param sample:  a json string or a dict, representing a sample event
@@ -632,7 +658,7 @@ class Client(object):
                         results.append(s)
         return results
 
-    def get_metrics_by_names(self, metric_names, minutes):
+    def get_metrics_by_names(self, metric_names, minutes, resolution=None):
         if type(metric_names) != list and type(metric_names) == str:
             metric_names = [metric_names]
         elif type(metric_names) != str and type(metric_names) != list:
@@ -644,11 +670,12 @@ class Client(object):
                                 "use one or more of those: {metrics}"
                                 .format(name=metric_names,
                                         metrics=METRICS_LIST))
-
+        if resolution is None:
+            resolution = minutes
         metrics_string = ",".join(metric_names)
         url = self.rest_url + 'metrics?metrics=%s&from=-%dmin' \
                               '&resolution=%dmin' \
-                              '' % (metrics_string, minutes, minutes)
+                              '' % (metrics_string, minutes, resolution)
         res = self.__send_request(requests.get, url)
 
         response = parse_response_to_json(res)
@@ -716,7 +743,7 @@ class Client(object):
         if not values:
             return 0
 
-        return sum(values)/len(values)
+        return sum(values) / len(values)
 
     def get_max_latency(self, minutes):
         try:
@@ -784,7 +811,7 @@ class Client(object):
         """
         :param schema - return tables from a specific schema, else use default
         """
-        schema_string = '/%s' %  schema if schema is not None else ''
+        schema_string = '/%s' % schema if schema is not None else ''
         url = self.rest_url + 'tables%s?shallow=true' % schema_string
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
@@ -794,11 +821,11 @@ class Client(object):
         """
         :param shallow - only return schema and table names
         :param schema - return tables from a specific schema, else use default
-        """        
+        """
         if shallow:
-            return self.get_table_names(schema);
+            return self.get_table_names(schema)
 
-        schema_string = '/%s' %  schema if schema is not None else ''            
+        schema_string = '/%s' % schema if schema is not None else ''
         url = self.rest_url + 'tables%s' % schema_string
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
@@ -830,7 +857,9 @@ class Client(object):
         return nodes
 
     def get_output_node(self):
-        return self._get_node_by('category', 'OUTPUT')
+        url = self.rest_url + 'plumbing/outputs'
+        res = self.__send_request(requests.get, url)
+        return parse_response_to_json(res)[0]
 
     def set_output(self, output_config, output_name=None):
         """
@@ -888,7 +917,8 @@ class Client(object):
         return parse_response_to_json(res)
 
     def __fix_bigquery_config(self, output_config):
-        config_url = self.rest_url + 'zk-configuration/featureUseBigQueryNewConnectConfiguration'
+        config_url = self.rest_url + \
+            'zk-configuration/featureUseBigQueryNewConnectConfiguration'
         http_res = self.__send_request(requests.get, config_url)
         json_res = parse_response_to_json(http_res)
         if not json_res['featureUseBigQueryNewLoginConfiguration']:
@@ -924,7 +954,7 @@ class Client(object):
                              on the SSH server
         :return: :type dict. Response's content
         """
-        configuration =  {
+        configuration = {
             'hostname': hostname,
             'port': port,
             'schemaName': schema_name,
@@ -1105,20 +1135,47 @@ class Client(object):
         self.__send_request(requests.delete, url)
 
     def get_users(self):
-        url = self.rest_url + 'users/'
-
+        url = self.rest_url + 'user/'
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
 
     def get_settings(self):
         url = self.rest_url + 'settings/'
-
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
 
     def set_settings_email_notifications(self, email_settings_json):
         url = self.rest_url + "settings/email-notifications"
         self.__send_request(requests.post, url, json=email_settings_json)
+
+    def set_s3_retention(self, aws_bucket_name, aws_access_key, aws_secret_key,
+                         file_prefix=None, save_metadata=True, gzip=True,
+                         server_side_encryption=True):
+        """
+        Configure s3 retention which stores the raw events received by Alooma to
+        a custom S3 bucket. Retention files are stored in folders by input name
+        and timestamp.
+
+        :param aws_bucket_name: where retention files will be created
+        :param aws_access_key: with permissions to list and write files
+        :param aws_secret_key: to go with the aws_access_key
+        :param file_prefix: (optional) files will upload to s3://bucket/prefix/
+        :param save_metadata: save raw events with their metadata (default=True)
+        :param gzip: create gzipped files (default=True)
+        :param server_side_encryption: use S3 encryption (default=True)
+        """
+        s3_retention_config = {
+            'awsBucketName': aws_bucket_name,
+            'awsAccessKeyId': aws_access_key,
+            'awsSecretAccessKey': aws_secret_key,
+            'saveMetadata': save_metadata,
+            'gzip': gzip,
+            'serverSideEncryption': server_side_encryption
+        }
+        if file_prefix is not None:
+            s3_retention_config['filePrefix'] = file_prefix
+        url = self.rest_url + 'settings/s3-retention'
+        self.__send_request(requests.post, url, json=s3_retention_config)
 
     def delete_s3_retention(self):
         url = self.rest_url + "settings/s3-retention"
@@ -1166,24 +1223,6 @@ class Client(object):
         """
         restream_node = self._get_node_by("type", RESTREAM_QUEUE_TYPE_NAME)
         return restream_node["stats"]["availbleForRestream"]
-
-    def get_scheduled_queries(self):
-        """
-        Returns all scheduled queries
-        :return: a dict representing all scheduled queries
-        """
-        url = self.rest_url + 'consolidation'
-        return requests.get(url, **self.requests_params).json()
-
-    def get_scheduled_queries_in_error_state(self):
-        """
-        Returns all scheduled queries that have not successfully ran on
-        the last attempt
-        :return: a dict representing all failed scheduled queries
-        """
-        all_queries = self.get_scheduled_queries()
-        return {k: all_queries[k] for k in all_queries.keys()
-                if all_queries[k]['status'] not in ['active', 'done']}
 
     def _get_node_by(self, field, value):
         """
@@ -1241,11 +1280,38 @@ class Client(object):
 
         return res.json()
 
-    ## CONSOLIDATIONS ##
+    # SCHEDULED QUERIES #
+    def get_scheduled_queries(self):
+        """
+        Returns all scheduled queries
+        :return: a dict representing all scheduled queries
+        """
+        url = self.rest_url + 'consolidation'
+        return requests.get(url, **self.requests_params).json()
+
+    def remove_scheduled_query(self, query_id):
+        url = self.rest_url + 'consolidation/' + query_id
+        res = self.__send_request(requests.delete, url)
+        if not res.ok:
+            raise Exception('Failed deleting query id=%s '
+                            'status_code=%d response=%s' %
+                            (query_id, res.status_code, res.content))
+
+    def get_scheduled_queries_in_error_state(self):
+        """
+        Returns all scheduled queries that have not successfully ran on
+        the last attempt
+        :return: a dict representing all failed scheduled queries
+        """
+        all_queries = self.get_scheduled_queries()
+        return {k: all_queries[k] for k in all_queries.keys()
+                if all_queries[k]['status'] not in ['active', 'done']}
+
     def schedule_query(self, event_type, query, frequency=None, run_at=None):
         """ Return Requests Response to Create Query
 
-            :param event_type: Alooma Event Type Related to Query (or not)
+            :param event_type: Alooma Event Type Related to Query (exiting event
+                               type is required, even if just a placeholder)
             :param query: Desired Query to Schedule
             :param frequency: Desired hours between query runs
             :param run_at: Cron like string to run query on
@@ -1255,8 +1321,11 @@ class Client(object):
         if frequency is None and run_at is None:
             raise Exception('Must specify either run_at or frequency')
 
+        if event_type is None:
+            raise Exception('Event type must be provided')
+
         scheduled_query_url = self.rest_url + 'custom-consolidation'
-        
+
         # Prep Data for Consolidation Post
         data = {
             "custom_query": query,
@@ -1264,9 +1333,9 @@ class Client(object):
             "frequency": frequency,
             "run_at": run_at
         }
-        
-        return self.__send_request(requests.post, 
-                                   scheduled_query_url, 
+
+        return self.__send_request(requests.post,
+                                   scheduled_query_url,
                                    json=data)
 
     def publish_notification(self, level, description, data):
@@ -1286,15 +1355,13 @@ class Client(object):
         }
         
         res = requests.post(url, json=notification, **self.requests_params)
-
-        if not res:
-            raise Exception('Got status code %s for url: "%s" '
-                                          'with content: "%s"' %
-                                          (res.status_code, url, res.content))
+        res.raise_for_status()
+        
         return res
-    
+
 
 class Alooma(Client):
+
     def __init__(self, hostname, username, password, port=8443,
                  server_prefix=''):
         warnings.warn('%s class is deprecated, passing relevant arguments '
