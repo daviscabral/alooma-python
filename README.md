@@ -23,6 +23,10 @@ Alooma.py lets you programmatically perform all the basics of operating the Aloo
   import alooma
   api = alooma.Client(username="<YOUR_USERNAME>", password="<YOUR_PASSWORD>")
 
+  # If you have an API key, you may use it instead of your username and password
+  # by specifying it in the constructor:
+  api = alooma.Client(api_key="<YOUR_API_KEY>")
+
   # If you have more than one Alooma instance, you can choose the instance you want to
   # log into by specifying it in the constructor:
   api = alooma.Client(username="<YOUR_USERNAME>", password="<YOUR_PASSWORD>",

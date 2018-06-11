@@ -69,7 +69,7 @@ class FailedToCreateInputException(Exception):
 class Client(object):
 
     def __init__(self, username=None, password=None, account_name=None,
-                 base_url=None):
+                 base_url=None, api_key=None):
 
         if base_url is None:
             base_url = BASE_URL
@@ -82,6 +82,7 @@ class Client(object):
 
         self.rest_url = base_url + rest_path
 
+        self.api_key = api_key
         self.username = username
         self.password = password
         self.cookie = None
@@ -114,6 +115,11 @@ class Client(object):
                                 if response.content.decode() else ""))
 
     def __login(self):
+        if self.api_key:
+            headers = {"authorization": "API " + self.api_key}
+            self.requests_params["headers"] = headers
+            return
+
         url = self.rest_url + 'login'
         login_data = {"email": self.username, "password": self.password}
         response = requests.post(url, json=login_data)
