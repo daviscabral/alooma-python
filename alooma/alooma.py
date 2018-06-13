@@ -1338,6 +1338,27 @@ class Client(object):
                                    scheduled_query_url,
                                    json=data)
 
+    def publish_notification(self, level, description, data):
+        """ Publish a Notification to Alooma 
+            
+            :param level: ERROR, INFO
+            :param description: Text sent as description
+            :param data: Data sent to explain description
+        """
+
+        url = self.rest_url + "notifications/custom"
+
+        notification = {
+            'level': level,
+            'description': description,
+            'data': data
+        }
+        
+        res = requests.post(url, json=notification, **self.requests_params)
+        res.raise_for_status()
+        
+        return res
+
 
 class Alooma(Client):
 
