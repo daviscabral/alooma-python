@@ -556,7 +556,7 @@ class Client(object):
         :param event_type:  optional string containing an event type name
         :param error_codes: optional list of strings containing event status
                             codes. status codes may be any string returned by
-                            `get_sample_status_codes()`
+                            `get_samples_status_codes()`
         :return:    a list of 10 samples. if event_type is passed, only samples
                     of that event type will be returned. if error_codes
                     is given only samples of those status codes are returned.
@@ -1339,8 +1339,8 @@ class Client(object):
                                    json=data)
 
     def publish_notification(self, level, description, data):
-        """ Publish a Notification to Alooma 
-            
+        """ Publish a Notification to Alooma
+
             :param level: ERROR, INFO
             :param description: Text sent as description
             :param data: Data sent to explain description
@@ -1353,10 +1353,10 @@ class Client(object):
             'description': description,
             'data': data
         }
-        
+
         res = requests.post(url, json=notification, **self.requests_params)
         res.raise_for_status()
-        
+
         return res
 
 
